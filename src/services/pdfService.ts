@@ -10,6 +10,64 @@ export interface LoadedPdf {
   destroy: () => Promise<void>
 }
 
+export interface PdfContentItem {
+  id: string
+  title: string
+  pageNumber?: number
+  items: PdfContentItem[]
+}
+
+interface PdfOutlineNode {
+  title: string
+  dest: string | Array<unknown> | null
+  items: PdfOutlineNode[]
+}
+
+async function resolveOutlinePage(document: PDFDocumentProxy, destination: PdfOutlineNode['dest']) {
+  try {
+    const explicitDestination = typeof destination === 'string'
+      ? await document.getDestination(destination)
+      : destination
+    const target = explicitDestination?.[0]
+
+    if (typeof target === 'number') return target + 1
+    if (
+      target
+      && typeof target === 'object'
+      && 'num' in target
+      && 'gen' in target
+      && typeof target.num === 'number'
+      && typeof target.gen === 'number'
+    ) {
+      return (
+        await document.getPageIndex(target as Parameters<PDFDocumentProxy['getPageIndex']>[0])
+      ) + 1
+    }
+  } catch {
+    return undefined
+  }
+
+  return undefined
+}
+
+export async function getPdfContents(document: PDFDocumentProxy): Promise<PdfContentItem[]> {
+  const outline = (await document.getOutline().catch(() => [])) as PdfOutlineNode[] | null
+
+  const normalize = async (items: PdfOutlineNode[], parentId = 'contents'): Promise<PdfContentItem[]> => (
+    Promise.all(items.map(async (item, index) => {
+      const id = `${parentId}-${index}`
+      return {
+        id,
+        title: item.title.trim() || 'Untitled section',
+        pageNumber: await resolveOutlinePage(document, item.dest),
+        items: await normalize(item.items ?? [], id),
+      }
+    }))
+  )
+
+  return normalize(outline ?? [])
+}
+
 async function openDocument(bytes: Uint8Array): Promise<LoadedPdf> {
   const loadingTask = pdfjs.getDocument({ data: bytes })
 

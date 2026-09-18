@@ -18,6 +18,7 @@ A private, offline-first children's PDF bookshelf and reader. Books never leave 
 
 - A parent confirmation step before each PDF is saved, with editable title and author fields.
 - Direct page-number jumping for longer books, with safe limits from page 1 through the final page.
+- An expandable Contents panel that reads a PDF's embedded outline and jumps directly to a selected section.
 - Verified with a 130-page, 53.4 MB illustrated PDF from import through page rendering.
 
 ## Local development

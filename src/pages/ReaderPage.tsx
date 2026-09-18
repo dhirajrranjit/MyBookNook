@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import type { RenderTask } from 'pdfjs-dist'
 import { saveReadingProgress } from '../db/bookRepository'
-import type { LoadedPdf } from '../services/pdfService'
+import { PdfContentsPanel } from '../features/reader/PdfContentsPanel'
+import type { LoadedPdf, PdfContentItem } from '../services/pdfService'
 import type { BookRecord, FitMode } from '../types/entities'
 
 interface ReaderPageProps {
@@ -15,6 +16,9 @@ export function ReaderPage({ book, onBack }: ReaderPageProps) {
   const [fitMode, setFitMode] = useState<FitMode>(book.readerPreferences.fitMode)
   const [zoom, setZoom] = useState(book.readerPreferences.zoom || 1)
   const [pageInput, setPageInput] = useState(String(book.currentPage || 1))
+  const [contents, setContents] = useState<PdfContentItem[]>([])
+  const [isContentsLoading, setIsContentsLoading] = useState(true)
+  const [isContentsOpen, setIsContentsOpen] = useState(false)
   const [error, setError] = useState('')
   const [isRendering, setIsRendering] = useState(true)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -33,6 +37,14 @@ export function ReaderPage({ book, onBack }: ReaderPageProps) {
         }
         openedPdf = nextPdf
         setLoadedPdf(nextPdf)
+        void import('../services/pdfService').then(({ getPdfContents }) => getPdfContents(nextPdf.document)).then(
+          (items) => {
+            if (!disposed) setContents(items)
+          },
+          () => undefined,
+        ).finally(() => {
+          if (!disposed) setIsContentsLoading(false)
+        })
       },
       (reason) => setError(reason instanceof Error ? reason.message : 'This book could not be opened.'),
     )
@@ -104,11 +116,14 @@ export function ReaderPage({ book, onBack }: ReaderPageProps) {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'ArrowRight') setPageNumber((page) => Math.min(book.pageCount, page + 1))
       if (event.key === 'ArrowLeft') setPageNumber((page) => Math.max(1, page - 1))
-      if (event.key === 'Escape') onBack()
+      if (event.key === 'Escape') {
+        if (isContentsOpen) setIsContentsOpen(false)
+        else onBack()
+      }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [book.pageCount, onBack])
+  }, [book.pageCount, isContentsOpen, onBack])
 
   const nextPage = () => setPageNumber((page) => Math.min(book.pageCount, page + 1))
   const previousPage = () => setPageNumber((page) => Math.max(1, page - 1))
@@ -128,6 +143,10 @@ export function ReaderPage({ book, onBack }: ReaderPageProps) {
     <main className="reader-page">
       <header className="reader-header">
         <button className="reader-icon-button" type="button" onClick={onBack} aria-label="Back to bookshelf">←</button>
+        <button className="reader-contents-button" type="button" onClick={() => setIsContentsOpen(true)}>
+          <span aria-hidden="true">☰</span>
+          <span>Contents</span>
+        </button>
         <div className="reader-title">
           <strong>{book.title}</strong>
           <span>Page {pageNumber} of {book.pageCount}</span>
@@ -180,6 +199,18 @@ export function ReaderPage({ book, onBack }: ReaderPageProps) {
         </form>
         <button type="button" onClick={nextPage} disabled={pageNumber >= book.pageCount}>Next →</button>
       </nav>
+
+      {isContentsOpen && (
+        <PdfContentsPanel
+          items={contents}
+          isLoading={isContentsLoading}
+          onClose={() => setIsContentsOpen(false)}
+          onSelect={(selectedPage) => {
+            setPageNumber(Math.max(1, Math.min(book.pageCount, selectedPage)))
+            setIsContentsOpen(false)
+          }}
+        />
+      )}
     </main>
   )
 }
