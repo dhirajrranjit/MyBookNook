@@ -1,9 +1,9 @@
 import * as pdfjs from 'pdfjs-dist'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
-import PdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?worker'
+import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import { ImportError } from '../features/library/fileValidation'
 
-pdfjs.GlobalWorkerOptions.workerPort = new PdfWorker()
+pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl
 
 export interface LoadedPdf {
   document: PDFDocumentProxy
@@ -148,6 +148,9 @@ async function renderCover(document: PDFDocumentProxy) {
   return blob
 }
 
-export async function loadPdfForReading(pdfBlob: Blob) {
-  return openDocument(new Uint8Array(await pdfBlob.arrayBuffer()))
+export async function loadPdfForReading(pdfSource: Blob | ArrayBuffer) {
+  const data = pdfSource instanceof Blob
+    ? await pdfSource.arrayBuffer()
+    : pdfSource.slice(0)
+  return openDocument(new Uint8Array(data))
 }

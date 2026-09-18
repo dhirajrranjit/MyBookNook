@@ -1,7 +1,7 @@
 import { findBookByHash } from '../../db/bookRepository'
 import type { BookRecord } from '../../types/entities'
 import { createId } from '../../utils/ids'
-import { calculateFileHash, ImportError, validatePdfFile } from './fileValidation'
+import { calculateFileHash, validatePdfFile } from './fileValidation'
 
 function titleFromFileName(fileName: string) {
   return fileName
@@ -14,29 +14,31 @@ function titleFromFileName(fileName: string) {
 export async function prepareBookImport(file: File): Promise<BookRecord> {
   await validatePdfFile(file)
   const fileHash = await calculateFileHash(file)
-
-  if (await findBookByHash(fileHash)) {
-    throw new ImportError('This book is already in your nook.', 'duplicate')
-  }
+  const existingBook = await findBookByHash(fileHash)
 
   const { inspectPdf } = await import('../../services/pdfService')
   const details = await inspectPdf(file)
+  const [pdfData, coverData] = await Promise.all([
+    file.arrayBuffer(),
+    details.coverBlob.arrayBuffer(),
+  ])
   const book: BookRecord = {
-    id: createId(),
-    title: details.title || titleFromFileName(file.name) || 'Untitled book',
-    author: details.author || '',
+    id: existingBook?.id ?? createId(),
+    title: existingBook?.title || details.title || titleFromFileName(file.name) || 'Untitled book',
+    author: existingBook?.author || details.author || '',
     fileName: file.name,
     fileSize: file.size,
     fileHash,
-    pdfBlob: file,
-    coverBlob: details.coverBlob,
+    pdfData,
+    coverData,
     pageCount: details.pageCount,
-    currentPage: 1,
-    readingPercentage: 0,
-    importedAt: new Date().toISOString(),
-    isFavorite: false,
-    collectionIds: [],
-    readerPreferences: {
+    currentPage: Math.min(existingBook?.currentPage ?? 1, details.pageCount),
+    readingPercentage: existingBook?.readingPercentage ?? 0,
+    importedAt: existingBook?.importedAt ?? new Date().toISOString(),
+    lastOpenedAt: existingBook?.lastOpenedAt,
+    isFavorite: existingBook?.isFavorite ?? false,
+    collectionIds: existingBook?.collectionIds ?? [],
+    readerPreferences: existingBook?.readerPreferences ?? {
       fitMode: 'page',
       zoom: 1,
       readingDirection: 'left-to-right',

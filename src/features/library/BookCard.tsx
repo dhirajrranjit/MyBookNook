@@ -11,7 +11,7 @@ export function BookCard({ book, onOpen }: BookCardProps) {
   return (
     <button className="book-card" type="button" onClick={() => onOpen(book)}>
       <span className="book-cover">
-        <BookCover cover={book.coverBlob} title={book.title} />
+        <BookCover cover={book.coverData ?? book.coverBlob} title={book.title} />
         {book.readingPercentage > 0 && (
           <span className="cover-progress" style={{ '--progress': `${book.readingPercentage}%` } as CSSProperties}>
             <span className="sr-only">{book.readingPercentage}% read</span>

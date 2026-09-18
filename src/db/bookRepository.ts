@@ -10,9 +10,11 @@ export async function saveImportedBook(book: BookRecord) {
   await db.transaction('rw', db.books, async () => {
     if (book.fileHash) {
       const duplicate = await findBookByHash(book.fileHash)
-      if (duplicate) throw new Error('This book is already in your nook.')
+      if (duplicate && duplicate.id !== book.id) {
+        throw new Error('This book is already in your nook.')
+      }
     }
-    await db.books.add(book)
+    await db.books.put(book)
   })
 }
 

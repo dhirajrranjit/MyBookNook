@@ -13,8 +13,10 @@ export interface BookRecord {
   fileName: string
   fileSize: number
   fileHash?: string
-  pdfBlob: Blob
-  coverBlob: Blob
+  pdfData?: ArrayBuffer
+  coverData?: ArrayBuffer
+  pdfBlob?: Blob
+  coverBlob?: Blob
   pageCount: number
   currentPage: number
   readingPercentage: number

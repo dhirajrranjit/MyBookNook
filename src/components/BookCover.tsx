@@ -1,16 +1,30 @@
 import { useEffect, useState } from 'react'
 
 interface BookCoverProps {
-  cover: Blob
+  cover?: Blob | ArrayBuffer
   title: string
 }
 
 export function BookCover({ cover, title }: BookCoverProps) {
-  const [source] = useState(() => URL.createObjectURL(cover))
+  const [source, setSource] = useState('')
+  const [failed, setFailed] = useState(false)
 
   useEffect(() => {
-    return () => URL.revokeObjectURL(source)
-  }, [source])
+    setFailed(false)
+    if (!cover) {
+      setSource('')
+      return
+    }
 
-  return source ? <img src={source} alt={`Cover of ${title}`} /> : <div className="cover-loading" />
+    const coverBlob = cover instanceof Blob
+      ? cover
+      : new Blob([cover], { type: 'image/jpeg' })
+    const nextSource = URL.createObjectURL(coverBlob)
+    setSource(nextSource)
+    return () => URL.revokeObjectURL(nextSource)
+  }, [cover])
+
+  return source && !failed
+    ? <img src={source} alt={`Cover of ${title}`} onError={() => setFailed(true)} />
+    : <div className="cover-loading" aria-label={`Cover unavailable for ${title}`} />
 }

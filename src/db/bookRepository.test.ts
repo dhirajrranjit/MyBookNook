@@ -11,8 +11,8 @@ function makeBook(overrides: Partial<BookRecord> = {}): BookRecord {
     fileName: 'test.pdf',
     fileSize: 6,
     fileHash: 'same-hash',
-    pdfBlob: new Blob(['%PDF-']),
-    coverBlob: new Blob(['cover']),
+    pdfData: new TextEncoder().encode('%PDF-').buffer,
+    coverData: new TextEncoder().encode('cover').buffer,
     pageCount: 10,
     currentPage: 1,
     readingPercentage: 0,
@@ -54,5 +54,16 @@ describe('book repository', () => {
     expect(saved?.currentPage).toBe(10)
     expect(saved?.readingPercentage).toBe(100)
     expect(saved?.readerPreferences.fitMode).toBe('width')
+  })
+
+  it('allows the same book id to be reimported to repair its stored data', async () => {
+    await saveImportedBook(makeBook({ pdfData: undefined, pdfBlob: new Blob(['old']) }))
+    const repairedData = new TextEncoder().encode('%PDF-repaired').buffer
+
+    await saveImportedBook(makeBook({ pdfData: repairedData, pdfBlob: undefined }))
+
+    const saved = await db.books.get('book-1')
+    expect(saved?.pdfData?.byteLength).toBe(repairedData.byteLength)
+    expect(saved?.pdfBlob).toBeUndefined()
   })
 })

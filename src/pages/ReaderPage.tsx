@@ -23,13 +23,19 @@ export function ReaderPage({ book, onBack }: ReaderPageProps) {
   const [isRendering, setIsRendering] = useState(true)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
-  const touchStartX = useRef<number | null>(null)
 
   useEffect(() => {
     let disposed = false
     let openedPdf: LoadedPdf | null = null
+    const pdfSource = book.pdfData ?? book.pdfBlob
 
-    void import('../services/pdfService').then(({ loadPdfForReading }) => loadPdfForReading(book.pdfBlob)).then(
+    if (!pdfSource) {
+      setError('This saved copy is unavailable. Go back and add the same PDF again to repair it.')
+      setIsContentsLoading(false)
+      return
+    }
+
+    void import('../services/pdfService').then(({ loadPdfForReading }) => loadPdfForReading(pdfSource)).then(
       (nextPdf) => {
         if (disposed) {
           void nextPdf.destroy()
@@ -46,14 +52,14 @@ export function ReaderPage({ book, onBack }: ReaderPageProps) {
           if (!disposed) setIsContentsLoading(false)
         })
       },
-      (reason) => setError(reason instanceof Error ? reason.message : 'This book could not be opened.'),
+      () => setError('This saved copy is unavailable. Go back and add the same PDF again to repair it.'),
     )
 
     return () => {
       disposed = true
       if (openedPdf) void openedPdf.destroy()
     }
-  }, [book.pdfBlob])
+  }, [book.pdfBlob, book.pdfData])
 
   useEffect(() => {
     if (!loadedPdf || !canvasRef.current || !stageRef.current) return
@@ -166,14 +172,6 @@ export function ReaderPage({ book, onBack }: ReaderPageProps) {
           className="reader-stage"
           ref={stageRef}
           onDoubleClick={() => { setFitMode('custom'); setZoom((value) => (value > 1.3 ? 1 : 1.6)) }}
-          onTouchStart={(event) => { touchStartX.current = event.touches[0]?.clientX ?? null }}
-          onTouchEnd={(event) => {
-            if (touchStartX.current === null) return
-            const distance = (event.changedTouches[0]?.clientX ?? touchStartX.current) - touchStartX.current
-            if (distance < -60) nextPage()
-            if (distance > 60) previousPage()
-            touchStartX.current = null
-          }}
         >
           {isRendering && <div className="page-loader" role="status">Drawing page…</div>}
           <canvas ref={canvasRef} aria-label={`Page ${pageNumber} of ${book.title}`} />
