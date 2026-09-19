@@ -1,9 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { saveCustomContents } from '../db/bookRepository'
 import { db } from '../db/database'
 import type { CustomContentItem } from '../types/entities'
 import { createId } from '../utils/ids'
+import {
+  downloadContentsBackup,
+  importContentsBackup,
+} from '../features/library/customContentsTransfer'
 
 interface ParentToolsPageProps {
   onDone: () => void
@@ -29,6 +33,8 @@ export function ParentToolsPage({ onDone }: ParentToolsPageProps) {
   const [selectedBookId, setSelectedBookId] = useState('')
   const [draftContents, setDraftContents] = useState<CustomContentItem[]>([])
   const [contentsStatus, setContentsStatus] = useState('')
+  const [transferStatus, setTransferStatus] = useState('')
+  const contentsImportRef = useRef<HTMLInputElement>(null)
   const selectedBook = books?.find((book) => book.id === selectedBookId)
 
   useEffect(() => {
@@ -76,6 +82,22 @@ export function ParentToolsPage({ onDone }: ParentToolsPageProps) {
     if (!navigator.storage?.persist) return
     setPersistent(await navigator.storage.persist())
     await refreshStorage()
+  }
+
+  const importContents = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+
+    try {
+      const result = await importContentsBackup(await file.text())
+      const skippedMessage = result.skipped.length
+        ? ` ${result.skipped.length} ${result.skipped.length === 1 ? 'book was' : 'books were'} not found on this device.`
+        : ''
+      setTransferStatus(`${result.updated} ${result.updated === 1 ? 'book' : 'books'} updated.${skippedMessage}`)
+    } catch (reason) {
+      setTransferStatus(reason instanceof Error ? reason.message : 'The contents backup could not be imported.')
+    }
   }
 
   return (
@@ -231,10 +253,45 @@ export function ParentToolsPage({ onDone }: ParentToolsPageProps) {
                 </button>
               </div>
               {contentsStatus && <p className="contents-editor-status" role="status">{contentsStatus}</p>}
+
             </div>
           ) : (
             <p>Add a book to the bookshelf first, then return here to create its contents.</p>
           )}
+        </article>
+
+        <article className="tool-card contents-transfer-card">
+          <span className="tool-number" aria-hidden="true">06</span>
+          <h2>Use contents on another device</h2>
+          <p>Export a small JSON file from this device. On the other device, add the same PDF books first, then import the JSON file. PDF files are not included.</p>
+          <div className="contents-transfer-actions">
+            <button
+              className="secondary-button"
+              type="button"
+              disabled={!books?.length}
+              onClick={() => {
+                downloadContentsBackup(books ?? [])
+                setTransferStatus('Contents backup exported.')
+              }}
+            >
+              Export contents
+            </button>
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={() => contentsImportRef.current?.click()}
+            >
+              Import contents
+            </button>
+            <input
+              ref={contentsImportRef}
+              className="visually-hidden-input"
+              type="file"
+              accept="application/json,.json"
+              onChange={importContents}
+            />
+          </div>
+          {transferStatus && <p className="contents-editor-status" role="status">{transferStatus}</p>}
         </article>
       </div>
     </section>

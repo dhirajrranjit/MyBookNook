@@ -655,6 +655,17 @@ h2 {
   font-weight: 800;
 }
 
+.contents-transfer-card {
+  grid-column: 1 / -1;
+  min-height: 0;
+}
+
+.contents-transfer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .reader-page {
   width: 100%;
   height: 100dvh;
@@ -1075,6 +1086,10 @@ h2 {
   .contents-editor-actions {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .contents-transfer-actions {
+    display: grid;
   }
 }
 
