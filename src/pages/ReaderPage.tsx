@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import type { RenderTask } from 'pdfjs-dist'
 import { saveReadingProgress } from '../db/bookRepository'
 import { PdfContentsPanel } from '../features/reader/PdfContentsPanel'
@@ -24,6 +24,16 @@ export function ReaderPage({ book, onBack }: ReaderPageProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
 
+  const customContents: PdfContentItem[] = useMemo(
+    () => (book.customContents ?? []).map((item) => ({
+      id: item.id,
+      title: item.title,
+      pageNumber: item.pageNumber,
+      items: [],
+    })),
+    [book.customContents],
+  )
+
   useEffect(() => {
     let disposed = false
     let openedPdf: LoadedPdf | null = null
@@ -45,9 +55,11 @@ export function ReaderPage({ book, onBack }: ReaderPageProps) {
         setLoadedPdf(nextPdf)
         void import('../services/pdfService').then(({ getPdfContents }) => getPdfContents(nextPdf.document)).then(
           (items) => {
-            if (!disposed) setContents(items)
+            if (!disposed) setContents(items.length ? items : customContents)
           },
-          () => undefined,
+          () => {
+            if (!disposed) setContents(customContents)
+          },
         ).finally(() => {
           if (!disposed) setIsContentsLoading(false)
         })
@@ -59,7 +71,7 @@ export function ReaderPage({ book, onBack }: ReaderPageProps) {
       disposed = true
       if (openedPdf) void openedPdf.destroy()
     }
-  }, [book.pdfBlob, book.pdfData])
+  }, [book.pdfBlob, book.pdfData, customContents])
 
   useEffect(() => {
     if (!loadedPdf || !canvasRef.current || !stageRef.current) return

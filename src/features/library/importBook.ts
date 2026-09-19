@@ -43,6 +43,7 @@ export async function prepareBookImport(file: File): Promise<BookRecord> {
       zoom: 1,
       readingDirection: 'left-to-right',
     },
+    customContents: existingBook?.customContents ?? [],
     isPasswordProtected: false,
     isEncryptedUnsupported: false,
   }

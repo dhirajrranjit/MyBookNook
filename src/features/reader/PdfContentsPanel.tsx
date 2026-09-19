@@ -96,7 +96,7 @@ export function PdfContentsPanel({ items, isLoading, onClose, onSelect }: PdfCon
         ) : (
           <div className="contents-empty">
             <strong>No chapter list found</strong>
-            <p>This PDF does not include a table of contents. Use the page-number box to jump through the book.</p>
+            <p>This PDF does not include a table of contents. A grown-up can add one in Parent Tools, or use the page-number box to jump through the book.</p>
           </div>
         )}
       </div>

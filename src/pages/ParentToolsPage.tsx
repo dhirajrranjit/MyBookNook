@@ -1,4 +1,9 @@
 import { useEffect, useState } from 'react'
+import { useLiveQuery } from 'dexie-react-hooks'
+import { saveCustomContents } from '../db/bookRepository'
+import { db } from '../db/database'
+import type { CustomContentItem } from '../types/entities'
+import { createId } from '../utils/ids'
 
 interface ParentToolsPageProps {
   onDone: () => void
@@ -20,6 +25,20 @@ export function ParentToolsPage({ onDone }: ParentToolsPageProps) {
   const [quota, setQuota] = useState<number>()
   const [persistent, setPersistent] = useState<boolean | null>(null)
   const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null)
+  const books = useLiveQuery(() => db.books.orderBy('title').toArray(), [])
+  const [selectedBookId, setSelectedBookId] = useState('')
+  const [draftContents, setDraftContents] = useState<CustomContentItem[]>([])
+  const [contentsStatus, setContentsStatus] = useState('')
+  const selectedBook = books?.find((book) => book.id === selectedBookId)
+
+  useEffect(() => {
+    if (!selectedBookId && books?.length) setSelectedBookId(books[0].id)
+  }, [books, selectedBookId])
+
+  useEffect(() => {
+    setDraftContents((selectedBook?.customContents ?? []).map((item) => ({ ...item })))
+    setContentsStatus('')
+  }, [selectedBookId, selectedBook?.customContents])
 
   const refreshStorage = async () => {
     if (!navigator.storage) return
@@ -119,6 +138,103 @@ export function ParentToolsPage({ onDone }: ParentToolsPageProps) {
           <span className="tool-number" aria-hidden="true">04</span>
           <h2>Protected PDFs</h2>
           <p>Password-protected and unsupported encrypted PDFs are rejected. Unlock the PDF first, then add the unlocked copy.</p>
+        </article>
+
+        <article className="tool-card contents-editor-card">
+          <span className="tool-number" aria-hidden="true">05</span>
+          <h2>Custom contents</h2>
+          <p>Add a simple chapter list for a PDF that does not include one. The book's built-in contents will be used first when available.</p>
+
+          {books?.length ? (
+            <div className="contents-editor">
+              <label className="field-label" htmlFor="contents-book">Book</label>
+              <select
+                id="contents-book"
+                value={selectedBookId}
+                onChange={(event) => setSelectedBookId(event.target.value)}
+              >
+                {books.map((book) => <option key={book.id} value={book.id}>{book.title}</option>)}
+              </select>
+
+              <div className="contents-editor-heading" aria-hidden="true">
+                <span>Section name</span>
+                <span>Page</span>
+                <span />
+              </div>
+
+              <div className="custom-contents-rows">
+                {draftContents.map((item, index) => (
+                  <div className="custom-contents-row" key={item.id}>
+                    <label className="sr-only" htmlFor={`section-title-${item.id}`}>Section {index + 1} name</label>
+                    <input
+                      id={`section-title-${item.id}`}
+                      type="text"
+                      value={item.title}
+                      placeholder="For example: Dinosaurs"
+                      onChange={(event) => setDraftContents((items) => items.map((entry) => (
+                        entry.id === item.id ? { ...entry, title: event.target.value } : entry
+                      )))}
+                    />
+                    <label className="sr-only" htmlFor={`section-page-${item.id}`}>Section {index + 1} page</label>
+                    <input
+                      id={`section-page-${item.id}`}
+                      className="contents-page-input"
+                      type="number"
+                      inputMode="numeric"
+                      min="1"
+                      max={selectedBook?.pageCount ?? 1}
+                      value={item.pageNumber}
+                      onChange={(event) => setDraftContents((items) => items.map((entry) => (
+                        entry.id === item.id ? { ...entry, pageNumber: Number(event.target.value) } : entry
+                      )))}
+                    />
+                    <button
+                      className="remove-content-button"
+                      type="button"
+                      aria-label={`Remove ${item.title || `section ${index + 1}`}`}
+                      onClick={() => setDraftContents((items) => items.filter((entry) => entry.id !== item.id))}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {!draftContents.length && <p className="contents-editor-empty">No custom sections yet.</p>}
+
+              <div className="contents-editor-actions">
+                <button
+                  className="secondary-button"
+                  type="button"
+                  onClick={() => setDraftContents((items) => [
+                    ...items,
+                    { id: createId(), title: '', pageNumber: 1 },
+                  ])}
+                >
+                  + Add section
+                </button>
+                <button
+                  className="primary-button"
+                  type="button"
+                  disabled={!selectedBook}
+                  onClick={async () => {
+                    if (!selectedBook) return
+                    try {
+                      await saveCustomContents(selectedBook.id, draftContents)
+                      setContentsStatus('Custom contents saved.')
+                    } catch (reason) {
+                      setContentsStatus(reason instanceof Error ? reason.message : 'Could not save the contents.')
+                    }
+                  }}
+                >
+                  Save contents
+                </button>
+              </div>
+              {contentsStatus && <p className="contents-editor-status" role="status">{contentsStatus}</p>}
+            </div>
+          ) : (
+            <p>Add a book to the bookshelf first, then return here to create its contents.</p>
+          )}
         </article>
       </div>
     </section>

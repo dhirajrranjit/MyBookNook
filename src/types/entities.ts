@@ -6,6 +6,12 @@ export interface ReaderPreferences {
   readingDirection: 'left-to-right'
 }
 
+export interface CustomContentItem {
+  id: string
+  title: string
+  pageNumber: number
+}
+
 export interface BookRecord {
   id: string
   title: string
@@ -25,6 +31,7 @@ export interface BookRecord {
   isFavorite: boolean
   collectionIds: string[]
   readerPreferences: ReaderPreferences
+  customContents?: CustomContentItem[]
   isPasswordProtected: boolean
   isEncryptedUnsupported: boolean
 }

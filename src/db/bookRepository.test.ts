@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { BookRecord } from '../types/entities'
 import { db } from './database'
-import { saveImportedBook, saveReadingProgress } from './bookRepository'
+import { saveCustomContents, saveImportedBook, saveReadingProgress } from './bookRepository'
 
 function makeBook(overrides: Partial<BookRecord> = {}): BookRecord {
   return {
@@ -65,5 +65,21 @@ describe('book repository', () => {
     const saved = await db.books.get('book-1')
     expect(saved?.pdfData?.byteLength).toBe(repairedData.byteLength)
     expect(saved?.pdfBlob).toBeUndefined()
+  })
+
+  it('saves custom contents and keeps page numbers inside the book', async () => {
+    await saveImportedBook(makeBook())
+
+    await saveCustomContents('book-1', [
+      { id: 'section-1', title: '  Dinosaurs  ', pageNumber: 4 },
+      { id: 'section-2', title: 'Space', pageNumber: 99 },
+      { id: 'blank', title: '   ', pageNumber: 2 },
+    ])
+
+    const saved = await db.books.get('book-1')
+    expect(saved?.customContents).toEqual([
+      { id: 'section-1', title: 'Dinosaurs', pageNumber: 4 },
+      { id: 'section-2', title: 'Space', pageNumber: 10 },
+    ])
   })
 })

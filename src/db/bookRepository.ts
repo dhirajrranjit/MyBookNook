@@ -1,5 +1,5 @@
 import { db } from './database'
-import type { BookRecord, ReaderPreferences } from '../types/entities'
+import type { BookRecord, CustomContentItem, ReaderPreferences } from '../types/entities'
 
 export async function findBookByHash(fileHash?: string) {
   if (!fileHash) return undefined
@@ -33,4 +33,19 @@ export async function saveReadingProgress(
     lastOpenedAt: new Date().toISOString(),
     readerPreferences: preferences,
   })
+}
+
+export async function saveCustomContents(id: string, items: CustomContentItem[]) {
+  const book = await db.books.get(id)
+  if (!book) throw new Error('This book is no longer in the bookshelf.')
+
+  const customContents = items
+    .map((item) => ({
+      id: item.id,
+      title: item.title.trim(),
+      pageNumber: Math.max(1, Math.min(book.pageCount, Math.round(item.pageNumber))),
+    }))
+    .filter((item) => item.title.length > 0)
+
+  await db.books.update(id, { customContents })
 }
